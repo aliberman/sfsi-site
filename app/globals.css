@@ -3,11 +3,27 @@
 @tailwind utilities;
 
 :root { --radius: 12px; }
+html { scroll-behavior: smooth; }
 body { @apply bg-white text-gray-900 antialiased; }
-.container { @apply max-w-6xl mx-auto px-4; }
-.btn { @apply inline-flex items-center rounded-2xl px-5 py-3 text-sm font-medium transition; }
-.btn-primary { @apply btn bg-brand-500 text-white hover:bg-brand-600; }
-.btn-ghost { @apply btn bg-transparent border border-gray-300 hover:bg-gray-50; }
-.card { @apply rounded-2xl shadow-sm border border-gray-200 p-6; }
-input, select, textarea { @apply border rounded-lg p-3; }
-label span { @apply text-sm; }
+h1, h2, h3 { @apply tracking-tight; }
+.font-display { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+
+@layer components {
+  .container { @apply max-w-6xl mx-auto px-4; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition disabled:opacity-60 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
+  .btn-gold { @apply btn bg-gold text-navy hover:brightness-95; }
+  .btn-ghost { @apply btn bg-white border border-gray-300 text-gray-800 hover:bg-gray-50; }
+  .btn-danger { @apply btn bg-white border border-rose-200 text-rose-700 hover:bg-rose-50; }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
+  .card { @apply rounded-2xl bg-white shadow-sm border border-gray-200 p-6; }
+  .input { @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20; }
+  .label { @apply grid gap-1 text-sm font-medium text-gray-700; }
+  .hint { @apply text-xs font-normal text-gray-500; }
+  .badge { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .table { @apply w-full text-sm; }
+  .table th { @apply text-left font-medium text-gray-500 px-3 py-2 border-b border-gray-200 whitespace-nowrap; }
+  .table td { @apply px-3 py-2 border-b border-gray-100 align-top; }
+  .section-title { @apply text-lg font-semibold text-gray-900; }
+  .link { @apply text-brand-700 underline-offset-2 hover:underline; }
+}

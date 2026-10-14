@@ -1,5 +1,6 @@
 [build]
-  command = "npm run build"
+  # Apply pending database migrations, then build the site.
+  command = "npm run db:migrate && npm run build"
   publish = ".next"
 
 [build.environment]

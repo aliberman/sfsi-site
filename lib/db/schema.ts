@@ -129,6 +129,11 @@ export const venues = pgTable("venues", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   neighborhood: text("neighborhood"),
+  address: text("address"),
+  // On-site contact (banquet manager, shul office). Internal only, never shown publicly.
+  contactName: text("contact_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
   capacity: integer("capacity"),
   shabbosFriendly: boolean("shabbos_friendly").notNull().default(false),
   description: text("description"),
@@ -162,9 +167,13 @@ export const catalogItems = pgTable("catalog_items", {
 
 export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
-  ownerId: uuid("owner_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+  // Null for events an operator created for a family without a portal account;
+  // the event is claimed when someone registers with `contactEmail`.
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   coordinatorId: uuid("coordinator_id").references(() => users.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   type: eventType("type").notNull(),
@@ -172,6 +181,29 @@ export const events = pgTable("events", {
   eventDate: date("event_date"),
   startTime: text("start_time"),
   endTime: text("end_time"),
+  // Key times for the day ("HH:MM").
+  cocktailsTime: text("cocktails_time"), // cocktails / reception / kabbalas panim
+  ceremonyTime: text("ceremony_time"), // ceremony / chuppah
+  dessertTime: text("dessert_time"),
+  venueAccessTime: text("venue_access_time"), // earliest setup time the venue allows
+  venueOutTime: text("venue_out_time"), // time everything must be out of the venue
+  // Wedding party.
+  groomName: text("groom_name"),
+  groomParents: text("groom_parents"),
+  brideName: text("bride_name"),
+  brideParents: text("bride_parents"),
+  // Responsible party for each side of a wedding.
+  groomContactName: text("groom_contact_name"),
+  groomContactPhone: text("groom_contact_phone"),
+  groomContactEmail: text("groom_contact_email"),
+  brideContactName: text("bride_contact_name"),
+  brideContactPhone: text("bride_contact_phone"),
+  brideContactEmail: text("bride_contact_email"),
+  // Outside party planner, if the family hired one.
+  plannerName: text("planner_name"),
+  plannerCompany: text("planner_company"),
+  plannerPhone: text("planner_phone"),
+  plannerEmail: text("planner_email"),
   guestCount: integer("guest_count"),
   venueId: uuid("venue_id").references(() => venues.id, { onDelete: "set null" }),
   venueNotes: text("venue_notes"),
@@ -179,6 +211,9 @@ export const events = pgTable("events", {
   budget: integer("budget"),
   notes: text("notes"),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  // When office staff lock the record, the family's intake form becomes read-only.
+  detailsLockedAt: timestamp("details_locked_at", { withTimezone: true }),
+  detailsLockedById: uuid("details_locked_by_id").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,
 });
 

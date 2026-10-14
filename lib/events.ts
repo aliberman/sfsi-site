@@ -20,7 +20,12 @@ export async function getAccessibleEvent(user: CurrentUser, eventId: string) {
   return event;
 }
 
-/** Statuses in which the client may still edit details and requests. */
+/** The family may edit the intake details until office staff lock them (or the event is over). */
+export function familyCanEditDetails(event: { detailsLockedAt: Date | null; status: string }) {
+  return !event.detailsLockedAt && event.status !== "completed" && event.status !== "cancelled";
+}
+
+/** Statuses in which the client may still change service and catering requests. */
 export function clientCanEdit(status: string) {
   return status === "draft" || status === "submitted" || status === "quoted";
 }
@@ -109,7 +114,17 @@ export async function provisionFromQuote(tx: Tx, eventId: string, quoteId: strin
   if (newTasks.length) await tx.insert(schema.tasks).values(newTasks);
   if (allocations.length) await tx.insert(schema.equipmentAllocations).values(allocations);
 
-  if (event.startTime) {
+  const wedding = event.type === "wedding";
+  const keyTimes: (typeof schema.scheduleItems.$inferInsert)[] = [
+    event.venueAccessTime && { eventId, time: formatTime(event.venueAccessTime), title: "Venue access: load-in & setup crew arrival", clientVisible: false },
+    event.cocktailsTime && { eventId, time: formatTime(event.cocktailsTime), title: wedding ? "Kabbalas Panim / cocktails" : "Reception / cocktails" },
+    event.ceremonyTime && { eventId, time: formatTime(event.ceremonyTime), title: wedding ? "Chuppah" : event.type === "bris" ? "Bris" : "Ceremony" },
+    event.dessertTime && { eventId, time: formatTime(event.dessertTime), title: "Dessert" },
+    event.venueOutTime && { eventId, time: formatTime(event.venueOutTime), title: "Breakdown complete: must be out of venue", clientVisible: false },
+  ].filter((x): x is typeof schema.scheduleItems.$inferInsert => Boolean(x));
+  if (keyTimes.length) {
+    await tx.insert(schema.scheduleItems).values(keyTimes);
+  } else if (event.startTime) {
     await tx.insert(schema.scheduleItems).values([
       { eventId, time: "3 hrs before start", title: "Load-in & setup crew arrival", clientVisible: false },
       { eventId, time: "2 hrs before start", title: "Caterer & mashgiach arrival", clientVisible: false },

@@ -54,7 +54,11 @@ export default async function AdminDashboard() {
 
   return (
     <div className="grid gap-8">
-      <PageHeader title="Operations dashboard" subtitle={formatDate(today, { weekday: "long", month: "long", day: "numeric" })} />
+      <PageHeader
+        title="Operations dashboard"
+        subtitle={formatDate(today, { weekday: "long", month: "long", day: "numeric" })}
+        actions={<Link href="/admin/events/new" className="btn-primary">New event</Link>}
+      />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Awaiting quote" value={byStatus.submitted ?? 0} hint={`${byStatus.quoted ?? 0} quotes out with clients`} />
         <Stat label="Booked & in production" value={(byStatus.booked ?? 0) + (byStatus.in_production ?? 0)} hint={`${upcoming.length} in the next 90 days`} />
@@ -78,7 +82,7 @@ export default async function AdminDashboard() {
               {needsQuote.map((e) => (
                 <li key={e.id} className="flex items-center justify-between gap-3 py-2">
                   <Link href={`/admin/events/${e.id}`} className="link font-medium">{e.title}</Link>
-                  <span className="text-gray-500">{e.owner.name} · {formatDate(e.eventDate)} · {e.guestCount} guests</span>
+                  <span className="text-gray-500">{e.owner?.name ?? e.contactName ?? "—"} · {formatDate(e.eventDate)} · {e.guestCount} guests</span>
                 </li>
               ))}
             </ul>

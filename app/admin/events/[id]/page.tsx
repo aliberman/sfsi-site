@@ -4,6 +4,8 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { AlertTriangle, Mail, Phone, Trash2 } from "lucide-react";
 import * as A from "@/app/actions/admin";
 import MessageThread from "@/components/MessageThread";
+import EventIntakeForm from "@/components/EventIntakeForm";
+import { pickIntakeValues, pickVenueOptions } from "@/lib/intake-values";
 import ResetForm from "@/components/ResetForm";
 import QuoteView, { QuoteTotals } from "@/components/QuoteView";
 import StatusStepper from "@/components/StatusStepper";
@@ -11,6 +13,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { EmptyState, Options, PageHeader, Pill, StatusBadge, Tabs } from "@/components/ui";
 import { requireOperator } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
+import { eventContact } from "@/lib/event-contact";
 import { allocatedOnDate } from "@/lib/events";
 import { loadEventDetail, paymentSummary, type EventDetail } from "@/lib/event-data";
 import {
@@ -20,6 +23,7 @@ import {
   EVENT_TYPE_LABELS,
   formatDate,
   formatDateTime,
+  formatTime,
   MEAL_TYPE_LABELS,
   money,
   PAYMENT_METHOD_LABELS,
@@ -56,7 +60,7 @@ export default async function AdminEventPage({ params, searchParams }: { params:
       <div className="text-sm"><Link href="/admin/events" className="link">← All events</Link></div>
       <PageHeader
         title={event.title}
-        subtitle={`${EVENT_TYPE_LABELS[event.type]} · ${formatDate(event.eventDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${event.guestCount ?? "?"} guests · ${event.owner.name}`}
+        subtitle={`${EVENT_TYPE_LABELS[event.type]} · ${formatDate(event.eventDate, { weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${event.guestCount ?? "?"} guests · ${eventContact(event).name ?? "No contact"}`}
         actions={<StatusBadge status={event.status} />}
       />
       <div className="card py-4"><StatusStepper status={event.status} /></div>
@@ -104,6 +108,39 @@ export default async function AdminEventPage({ params, searchParams }: { params:
   );
 }
 
+function ContactLine({ role, name, phone, email, extra }: { role: string; name?: string | null; phone?: string | null; email?: string | null; extra?: string | null }) {
+  if (!name && !phone && !email) return null;
+  return (
+    <div className="grid gap-0.5 border-t pt-2 first:border-0 first:pt-0">
+      <div className="text-xs uppercase tracking-wide text-gray-500">{role}</div>
+      {name && <div className="font-medium">{name}{extra && <span className="font-normal text-gray-500"> · {extra}</span>}</div>}
+      {phone && <a href={`tel:${phone}`} className="link flex items-center gap-2"><Phone className="h-3.5 w-3.5" />{phone}</a>}
+      {email && <a href={`mailto:${email}`} className="link flex items-center gap-2"><Mail className="h-3.5 w-3.5" />{email}</a>}
+    </div>
+  );
+}
+
+function ContactsCard({ event }: { event: EventDetail }) {
+  const family = eventContact(event);
+  return (
+    <div className="card grid gap-3 text-sm">
+      <h2 className="section-title">Contacts</h2>
+      <ContactLine role={family.hasAccount ? "Family (portal account)" : "Family"} name={family.name} phone={family.phone} email={family.email} />
+      {!family.hasAccount && (
+        <p className="text-xs text-gray-500">
+          {family.email ? `No portal account yet. The event links automatically when ${family.email} registers.` : "Add an email to let the family see this event in their portal."}
+        </p>
+      )}
+      <ContactLine role="Groom’s side" name={event.groomContactName} phone={event.groomContactPhone} email={event.groomContactEmail} />
+      <ContactLine role="Bride’s side" name={event.brideContactName} phone={event.brideContactPhone} email={event.brideContactEmail} />
+      <ContactLine role="Party planner" name={event.plannerName} extra={event.plannerCompany} phone={event.plannerPhone} email={event.plannerEmail} />
+      {event.venue && (
+        <ContactLine role={`Venue: ${event.venue.name}`} name={event.venue.contactName} phone={event.venue.contactPhone} email={event.venue.contactEmail} extra={event.venue.address} />
+      )}
+    </div>
+  );
+}
+
 async function Overview({ event }: { event: EventDetail }) {
   const [operators, venues] = await Promise.all([
     db.query.users.findMany({ where: inArray(schema.users.role, ["operator", "admin"]), orderBy: [asc(schema.users.name)] }),
@@ -113,46 +150,37 @@ async function Overview({ event }: { event: EventDetail }) {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="grid content-start gap-6 lg:col-span-2">
-        <form action={A.updateEventDetails} className="card grid gap-4">
-          <h2 className="section-title">Logistics</h2>
-          <Hidden eventId={event.id} />
-          <div className="grid gap-4 sm:grid-cols-4">
-            <label className="label">Date<input type="date" name="eventDate" defaultValue={event.eventDate ?? ""} className="input" /></label>
-            <label className="label">Start<input type="time" name="startTime" defaultValue={event.startTime ?? ""} className="input" /></label>
-            <label className="label">End<input type="time" name="endTime" defaultValue={event.endTime ?? ""} className="input" /></label>
-            <label className="label">Guests<input type="number" name="guestCount" defaultValue={event.guestCount ?? ""} className="input" /></label>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="label">Venue
-              <select name="venueId" defaultValue={event.venueId ?? ""} className="input">
-                <option value="">Client venue / TBD</option>
-                {venues.map((v) => <option key={v.id} value={v.id}>{v.name}{v.capacity ? ` (${v.capacity})` : ""}</option>)}
-              </select>
-            </label>
-            <label className="label">Venue notes<input name="venueNotes" defaultValue={event.venueNotes ?? ""} className="input" /></label>
-          </div>
-          {event.venue?.capacity && event.guestCount && event.guestCount > event.venue.capacity && (
-            <p className="flex items-center gap-2 text-sm text-amber-700"><AlertTriangle className="h-4 w-4" />Guest count exceeds venue capacity ({event.venue.capacity}).</p>
-          )}
-          <SubmitButton className="btn-primary w-fit">Save logistics</SubmitButton>
-        </form>
+        <div className="card">
+          {event.venue?.capacity && event.guestCount && event.guestCount > event.venue.capacity ? (
+            <p className="mb-4 flex items-center gap-2 text-sm text-amber-700"><AlertTriangle className="h-4 w-4" />Guest count exceeds venue capacity ({event.venue.capacity}).</p>
+          ) : null}
+          <EventIntakeForm action={A.updateOperatorEvent} event={pickIntakeValues(event)} venues={pickVenueOptions(venues)} hasPortalAccount={Boolean(event.owner)} submitLabel="Save event" />
+        </div>
         <div className="card text-sm">
-          <h2 className="section-title mb-3">From the family</h2>
+          <h2 className="section-title mb-3">From the family’s portal request</h2>
           <dl className="grid gap-2 sm:grid-cols-2">
             <div><dt className="text-gray-500">Package</dt><dd>{event.package?.name ?? "À la carte"}</dd></div>
             <div><dt className="text-gray-500">Budget</dt><dd>{money(event.budget)}</dd></div>
+            <div><dt className="text-gray-500">Start – end</dt><dd>{event.startTime ? `${formatTime(event.startTime)}${event.endTime ? ` – ${formatTime(event.endTime)}` : ""}` : "—"}</dd></div>
+            <div><dt className="text-gray-500">Venue notes</dt><dd>{event.venueNotes ?? "—"}</dd></div>
             <div><dt className="text-gray-500">Submitted</dt><dd>{event.submittedAt ? formatDateTime(event.submittedAt) : "Not yet"}</dd></div>
           </dl>
-          {event.notes && <p className="mt-3 whitespace-pre-line rounded-lg bg-gray-50 p-3">{event.notes}</p>}
         </div>
       </div>
       <div className="grid content-start gap-6">
-        <div className="card grid gap-2 text-sm">
-          <h2 className="section-title">Client</h2>
-          <div className="font-medium">{event.owner.name}</div>
-          <a href={`mailto:${event.owner.email}`} className="link flex items-center gap-2"><Mail className="h-4 w-4" />{event.owner.email}</a>
-          {event.owner.phone && <a href={`tel:${event.owner.phone}`} className="link flex items-center gap-2"><Phone className="h-4 w-4" />{event.owner.phone}</a>}
-        </div>
+        <form action={A.setDetailsLock} className="card grid gap-2 text-sm">
+          <h2 className="section-title">Family editing</h2>
+          <Hidden eventId={event.id} lock={event.detailsLockedAt ? "false" : "true"} />
+          <p className="text-gray-600">
+            {event.detailsLockedAt
+              ? `Locked ${formatDateTime(event.detailsLockedAt)}. The family sees their intake details read-only.`
+              : "The family can still edit their intake details. Lock once details are final."}
+          </p>
+          <SubmitButton className={event.detailsLockedAt ? "btn-ghost w-fit" : "btn-primary w-fit"}>
+            {event.detailsLockedAt ? "Unlock for family" : "Lock details"}
+          </SubmitButton>
+        </form>
+        <ContactsCard event={event} />
         <form action={A.setEventStatus} className="card grid gap-3">
           <h2 className="section-title">Status</h2>
           <Hidden eventId={event.id} />

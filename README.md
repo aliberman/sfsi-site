@@ -2,7 +2,13 @@
 
 Next.js 14 (App Router) site with a **family portal** and an **operator back office**.
 
-- **Public site:** home, about, packages, venues & vendors, get involved, donate, partners, contact. Packages and venues are managed in the back office, and every form saves to the Inquiries inbox.
+- **Public site:** home, about, packages, venues & vendors, get involved, donate, partners, contact. Packages, venues, and vendors are managed in the back office, and every form saves to the Inquiries inbox.
+- **Live impact numbers** on the home page (see `/admin/settings`):
+  - *Families hosted*: distinct families with a completed event, plus a configurable count from before the portal.
+  - *Average savings*: an out-of-state cost-per-guest benchmark × guests, minus each booked event's accepted quote.
+  - *Approved venues & vendors*: active venues plus approved vendors.
+
+  A number stays hidden until there's real data behind it.
 - **Family portal** (`/portal`): families register, create an event, request services and equipment from the catalog, request catering quotes, submit for review, accept quotes online, follow their payment plan (pay online through Stripe, or offline), message their coordinator, and see the day-of timeline.
 - **Back office** (`/admin`, operators and admins): pipeline dashboard (awaiting quote, upcoming events, overdue payments, tasks due), quote builder prefilled from requests and catalog pricing (discount, community subsidy, tax), payment plans (deposit plus installments; record check/Zelle/cash; adjust or waive), provisioning (auto-generated checklist, staff assignments with double-booking hints, equipment allocation with inventory conflict detection, run of show), internal notes, catalog, staff roster, venues, packages, inquiries, and user roles.
 
@@ -41,10 +47,10 @@ Other scripts: `npm run typecheck`, `npm run lint`, `npm test` (payment schedule
 
 ## Deploying to Netlify
 
-1. Create a Postgres database (Neon or Supabase both work well with Netlify) and copy its **pooled** connection string.
-2. In Netlify → Site settings → Environment variables, set the variables from `.env.example` (at minimum `DATABASE_URL`, `AUTH_SECRET`, `SITE_URL`).
-3. Deploy. The build command (`netlify.toml`) runs migrations and then `next build`.
-4. Run `npm run db:seed` once against the production `DATABASE_URL` to load reference data and create your admin.
+1. Create a Postgres database (Neon or Supabase both work well with Netlify) and copy its connection string. Neon's default string works as-is; libpq-only options like `channel_binding` are stripped automatically.
+2. In Netlify → Site settings → Environment variables, set the variables from `.env.example`: at minimum `DATABASE_URL`, `AUTH_SECRET`, `SITE_URL`, plus `ADMIN_EMAIL` / `ADMIN_PASSWORD` for your first login.
+3. Deploy. The build command (`netlify.toml`) runs migrations, then the seed, then `next build`. The seed only fills empty tables and creates (or promotes) `ADMIN_EMAIL`, so it's safe on every deploy. After your first sign-in you can remove `ADMIN_PASSWORD`.
+4. In `/admin/settings`, set the out-of-state cost per guest and any families hosted before the portal.
 5. Optional: add a Stripe webhook to `https://<site>/api/stripe/webhook` for `checkout.session.completed`, and set `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`.
 
 ## Project layout

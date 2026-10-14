@@ -98,6 +98,15 @@ export const taskStatus = pgEnum("task_status", ["todo", "in_progress", "done"])
 
 export const inquiryKind = pgEnum("inquiry_kind", ["plan", "partner", "donate", "general"]);
 
+export const vendorCategory = pgEnum("vendor_category", [
+  "caterer",
+  "music",
+  "photo_video",
+  "florist_decor",
+  "rentals",
+  "other",
+]);
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -350,6 +359,27 @@ export const activity = pgTable("activity", {
   actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
   action: text("action").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Partner businesses in SFSI's approved network (listed publicly when active).
+export const vendors = pgTable("vendors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  category: vendorCategory("category").notNull(),
+  description: text("description"),
+  website: text("website"),
+  phone: text("phone"),
+  email: text("email"),
+  hechsher: text("hechsher"),
+  active: boolean("active").notNull().default(true),
+  ...timestamps,
+});
+
+// Operator-editable site settings, stored as JSON values by key.
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
 });
 
 export const inquiries = pgTable("inquiries", {

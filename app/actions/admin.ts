@@ -11,6 +11,7 @@ import { bool, int, isoDateOrNull, oneOf, optStr, str, uuidOrNull } from "@/lib/
 import { sendEmail, siteUrl } from "@/lib/notify";
 import { createOrReplacePlan, DEFAULT_PLAN, refreshPlanStatus } from "@/lib/plans";
 import { defaultQuantity, quoteTotals } from "@/lib/quotes";
+import { saveSettings } from "@/lib/settings";
 
 const eventPath = (id: string) => `/admin/events/${id}`;
 
@@ -630,4 +631,38 @@ export async function setUserRole(formData: FormData) {
     .set({ role: oneOf(formData, "role", schema.userRole.enumValues) })
     .where(eq(schema.users.id, id));
   revalidatePath("/admin/users");
+}
+
+export async function saveVendor(formData: FormData) {
+  await requireOperator();
+  const id = uuidOrNull(formData, "id");
+  const name = str(formData, "name");
+  if (!name) throw new Error("Name is required.");
+  const website = optStr(formData, "website");
+  const values = {
+    name,
+    category: oneOf(formData, "category", schema.vendorCategory.enumValues),
+    description: optStr(formData, "description"),
+    website: website && !/^https?:\/\//i.test(website) ? `https://${website}` : website,
+    phone: optStr(formData, "phone"),
+    email: optStr(formData, "email"),
+    hechsher: optStr(formData, "hechsher"),
+    active: bool(formData, "active"),
+  };
+  if (id) await db.update(schema.vendors).set(values).where(eq(schema.vendors.id, id));
+  else await db.insert(schema.vendors).values(values);
+  revalidatePath("/admin/vendors");
+  revalidatePath("/venues");
+  revalidatePath("/");
+}
+
+export async function saveImpactSettings(formData: FormData) {
+  await requireOperator();
+  const prior = int(formData, "priorFamiliesHosted", 0) ?? 0;
+  await saveSettings({
+    outOfStateCostPerGuest: toCents(formData.get("outOfStateCostPerGuest")) || null,
+    priorFamiliesHosted: Math.max(prior, 0),
+  });
+  revalidatePath("/admin/settings");
+  revalidatePath("/");
 }

@@ -9,3 +9,7 @@ export function activePackages() {
 export function activeVenues() {
   return db.query.venues.findMany({ where: eq(schema.venues.active, true), orderBy: [asc(schema.venues.name)] });
 }
+
+export function activeVendors() {
+  return db.query.vendors.findMany({ where: eq(schema.vendors.active, true), orderBy: [asc(schema.vendors.category), asc(schema.vendors.name)] });
+}

@@ -167,3 +167,12 @@ export function formatTime(value: string | null | undefined) {
   const h = Number(m[1]);
   return `${h % 12 || 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
 }
+
+export const VENDOR_CATEGORY_LABELS: Record<string, string> = {
+  caterer: "Caterers",
+  music: "Music & entertainment",
+  photo_video: "Photo & video",
+  florist_decor: "Florals & décor",
+  rentals: "Rentals",
+  other: "Other services",
+};

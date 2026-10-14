@@ -12,8 +12,9 @@ import { count, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../lib/db/schema";
+import { databaseUrl } from "../lib/db/url";
 
-const sql = postgres(process.env.DATABASE_URL!, { max: 1, prepare: false });
+const sql = postgres(databaseUrl(), { max: 1, prepare: false });
 const db = drizzle(sql, { schema });
 const demo = process.argv.includes("--demo");
 const $ = (dollars: number) => Math.round(dollars * 100);

@@ -49,7 +49,7 @@ Other scripts: `npm run typecheck`, `npm run lint`, `npm test` (payment schedule
 
 1. Create a Postgres database (Neon or Supabase both work well with Netlify) and copy its connection string. Neon's default string works as-is; libpq-only options like `channel_binding` are stripped automatically.
 2. In Netlify → Site settings → Environment variables, set the variables from `.env.example`: at minimum `DATABASE_URL`, `AUTH_SECRET`, `SITE_URL`, plus `ADMIN_EMAIL` / `ADMIN_PASSWORD` for your first login.
-3. Deploy. The build command (`netlify.toml`) runs migrations, then the seed, then `next build`. The seed only fills empty tables and creates (or promotes) `ADMIN_EMAIL`, so it's safe on every deploy. After your first sign-in you can remove `ADMIN_PASSWORD`.
+3. Deploy. The build command (`netlify.toml`) runs migrations, then the seed, then `next build`. The seed only fills empty tables, and makes `ADMIN_EMAIL` an admin whose password is `ADMIN_PASSWORD` (creating the account if needed), so it's safe on every deploy. The build log shows an `Admin:` line saying what happened. Make sure both variables are available to **Builds** in Netlify. After your first sign-in, remove `ADMIN_PASSWORD` so later deploys stop resetting it.
 4. In `/admin/settings`, set the out-of-state cost per guest and any families hosted before the portal.
 5. Optional: add a Stripe webhook to `https://<site>/api/stripe/webhook` for `checkout.session.completed`, and set `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`.
 

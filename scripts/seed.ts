@@ -83,27 +83,45 @@ async function main() {
     console.log("Seeded catalog (placeholder prices)");
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-  if (adminEmail) {
-    const existing = await db.query.users.findFirst({ where: eq(schema.users.email, adminEmail) });
-    if (existing) {
-      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, existing.id));
-      console.log(`Promoted ${adminEmail} to admin`);
-    } else if (process.env.ADMIN_PASSWORD) {
-      await db.insert(schema.users).values({
-        email: adminEmail,
-        name: process.env.ADMIN_NAME ?? "SFSI Admin",
-        role: "admin",
-        passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD, 12),
-      });
-      console.log(`Created admin ${adminEmail}`);
-    } else {
-      console.log("Set ADMIN_PASSWORD to create the admin account (or register first, then re-run to promote).");
-    }
-  }
+  await ensureAdmin();
 
   if (demo) await seedDemo();
   await sql.end();
+}
+
+/**
+ * ADMIN_EMAIL / ADMIN_PASSWORD are authoritative: on every run the account is
+ * created if missing, made an admin, and its password set to ADMIN_PASSWORD.
+ * Remove ADMIN_PASSWORD once you've signed in to stop resetting it.
+ */
+async function ensureAdmin() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  if (!adminEmail) {
+    console.log("Admin: ADMIN_EMAIL is not set; skipping admin setup.");
+    return;
+  }
+  const existing = await db.query.users.findFirst({ where: eq(schema.users.email, adminEmail) });
+  if (password && password !== password.trim()) {
+    console.log("Admin: warning, ADMIN_PASSWORD starts or ends with whitespace; it is used exactly as set.");
+  }
+  if (existing) {
+    await db
+      .update(schema.users)
+      .set({ role: "admin", ...(password ? { passwordHash: await bcrypt.hash(password, 12) } : {}) })
+      .where(eq(schema.users.id, existing.id));
+    console.log(`Admin: ${adminEmail} is an admin${password ? "; password set from ADMIN_PASSWORD" : " (password unchanged: ADMIN_PASSWORD not set)"}.`);
+  } else if (password) {
+    await db.insert(schema.users).values({
+      email: adminEmail,
+      name: process.env.ADMIN_NAME ?? "SFSI Admin",
+      role: "admin",
+      passwordHash: await bcrypt.hash(password, 12),
+    });
+    console.log(`Admin: created ${adminEmail}.`);
+  } else {
+    console.log(`Admin: no account for ${adminEmail} and ADMIN_PASSWORD is not set; nothing created.`);
+  }
 }
 
 async function seedDemo() {

@@ -1,5 +1,7 @@
 [build]
-  command = "npm run build"
+  # Apply pending migrations and load starter data (the seed only fills empty
+  # tables and creates/promotes ADMIN_EMAIL), then build the site.
+  command = "npm run db:migrate && npm run db:seed && npm run build"
   publish = ".next"
 
 [build.environment]

@@ -1,12 +1,20 @@
-export default function ImpactStrip() {
+import { money } from "@/lib/format";
+import { getImpactStats } from "@/lib/impact";
+
+export default async function ImpactStrip() {
+  const stats = await getImpactStats();
   const items = [
-    { label: "Families hosted locally", value: "42" },
-    { label: "Avg. savings vs. out-of-state", value: "$5,100" },
-    { label: "Approved vendors", value: "27" },
-  ];
+    { label: "Families hosted locally", value: stats.families?.toLocaleString("en-US") },
+    { label: "Avg. savings vs. out-of-state", value: stats.savings != null ? money(stats.savings).replace(/\.\d\d$/, "") : undefined },
+    { label: "Approved venues & vendors", value: stats.partners?.toLocaleString("en-US") },
+  ].filter((i): i is { label: string; value: string } => Boolean(i.value));
+
+  // Stats appear as real data accumulates; nothing is shown until there is something true to show.
+  if (items.length === 0) return null;
+  const cols = items.length === 3 ? "sm:grid-cols-3" : items.length === 2 ? "sm:grid-cols-2" : "";
   return (
     <section className="bg-navy text-white">
-      <div className="container py-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className={`container grid grid-cols-1 gap-6 py-10 ${cols}`}>
         {items.map((i) => (
           <div key={i.label} className="text-center">
             <div className="text-3xl font-semibold text-gold">{i.value}</div>

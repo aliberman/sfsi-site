@@ -10,6 +10,14 @@ Next.js 14 (App Router) site with a **family portal** and an **operator back off
 
   A number stays hidden until there's real data behind it.
 - **Family portal** (`/portal`): families register, create an event, request services and equipment from the catalog, request catering quotes, submit for review, accept quotes online, follow their payment plan (pay online through Stripe, or offline), message their coordinator, and see the day-of timeline.
+- **Event intake** (shared by both sides):
+  - type (Wedding, Bar Mitzvah, Bris Milah), date and expected guests;
+  - venue with address and on-site contact (families never see a listed venue's internal contact);
+  - for weddings: chosson and kallah, their parents, and a responsible party for each side;
+  - party planner;
+  - key times: venue access/setup, Kabbalas Panim/cocktails, Chuppah/ceremony, dessert, must-be-out.
+
+  Families edit it in the portal until office staff **lock** it. Operators can create events for families without accounts; the event links to the family when they register with the contact email.
 - **Back office** (`/admin`, operators and admins): pipeline dashboard (awaiting quote, upcoming events, overdue payments, tasks due), quote builder prefilled from requests and catalog pricing (discount, community subsidy, tax), payment plans (deposit plus installments; record check/Zelle/cash; adjust or waive), provisioning (auto-generated checklist, staff assignments with double-booking hints, equipment allocation with inventory conflict detection, run of show), internal notes, catalog, staff roster, venues, packages, inquiries, and user roles.
 
 ## Workflow

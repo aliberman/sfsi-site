@@ -16,6 +16,10 @@ function VenueForm({ v }: { v?: Venue }) {
       <label className="label sm:col-span-2">Neighborhood<input name="neighborhood" defaultValue={v?.neighborhood ?? ""} className="input" /></label>
       <label className="label">Capacity<input name="capacity" type="number" min={0} defaultValue={v?.capacity ?? ""} className="input" /></label>
       <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="shabbosFriendly" defaultChecked={v?.shabbosFriendly ?? false} /> Shabbos-friendly</label>
+      <label className="label sm:col-span-6">Address<input name="address" defaultValue={v?.address ?? ""} className="input" /></label>
+      <label className="label sm:col-span-2">Venue contact <span className="hint">internal only</span><input name="contactName" defaultValue={v?.contactName ?? ""} className="input" /></label>
+      <label className="label sm:col-span-2">Contact phone<input name="contactPhone" type="tel" defaultValue={v?.contactPhone ?? ""} className="input" /></label>
+      <label className="label sm:col-span-2">Contact email<input name="contactEmail" type="email" defaultValue={v?.contactEmail ?? ""} className="input" /></label>
       <label className="label sm:col-span-5">Description<input name="description" defaultValue={v?.description ?? ""} className="input" /></label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="active" defaultChecked={v?.active ?? true} /> Listed publicly</label>
       <SubmitButton className="btn-primary w-fit">{v ? "Save" : "Add venue"}</SubmitButton>

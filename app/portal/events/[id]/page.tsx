@@ -14,7 +14,7 @@ import {
   submitEvent,
   updateEvent,
 } from "@/app/actions/portal";
-import EventForm from "@/components/EventForm";
+import EventIntakeForm from "@/components/EventIntakeForm";
 import MessageThread from "@/components/MessageThread";
 import ResetForm from "@/components/ResetForm";
 import QuoteView from "@/components/QuoteView";
@@ -23,7 +23,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { EmptyState, Options, PageHeader, Pill, StatusBadge, Tabs } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { clientCanEdit } from "@/lib/events";
+import { clientCanEdit, familyCanEditDetails } from "@/lib/events";
+import { pickFamilyVenueOptions, pickIntakeValues } from "@/lib/intake-values";
 import { loadEventDetail, paymentSummary } from "@/lib/event-data";
 import {
   CATEGORY_LABELS,
@@ -38,7 +39,7 @@ import {
   todayIso,
   UNIT_LABELS,
 } from "@/lib/format";
-import { activePackages, activeVenues } from "@/lib/public-data";
+import { activePackages } from "@/lib/public-data";
 import { quoteTotals } from "@/lib/quotes";
 import { getStripe } from "@/lib/stripe";
 
@@ -48,7 +49,7 @@ export default async function PortalEventPage({ params, searchParams }: { params
   const user = await requireUser();
   if (!/^[0-9a-f-]{36}$/i.test(params.id)) notFound();
   const event = await loadEventDetail(params.id);
-  if (!event || event.owner.id !== user.id) notFound();
+  if (!event || event.owner?.id !== user.id) notFound();
 
   const tab = searchParams.tab ?? "overview";
   const editable = clientCanEdit(event.status);
@@ -92,7 +93,7 @@ export default async function PortalEventPage({ params, searchParams }: { params
         ]}
       />
 
-      {tab === "overview" && <Overview event={event} editable={editable} />}
+      {tab === "overview" && <Overview event={event} />}
       {tab === "services" && <Services event={event} editable={editable} />}
       {tab === "catering" && <Catering event={event} editable={editable} />}
       {tab === "quote" && <Quotes event={event} quotes={visibleQuotes} />}
@@ -113,8 +114,9 @@ export default async function PortalEventPage({ params, searchParams }: { params
 
 type Detail = NonNullable<Awaited<ReturnType<typeof loadEventDetail>>>;
 
-async function Overview({ event, editable }: { event: Detail; editable: boolean }) {
-  const [venues, packages] = await Promise.all([activeVenues(), activePackages()]);
+async function Overview({ event }: { event: Detail }) {
+  const [venues, packages] = await Promise.all([db.query.venues.findMany({ orderBy: [asc(schema.venues.name)] }), activePackages()]);
+  const canEdit = familyCanEditDetails(event);
   const schedule = event.scheduleItems.filter((s) => s.clientVisible);
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -139,19 +141,45 @@ async function Overview({ event, editable }: { event: Detail; editable: boolean 
           </div>
         )}
         <div className="card">
-          <h2 className="section-title mb-4">Event details</h2>
-          {!editable && <p className="mb-4 text-sm text-gray-600">Your event is booked. To change details, message your coordinator.</p>}
-          <EventForm action={updateEvent} event={event} venues={venues} packages={packages} submitLabel="Save details" disabled={!editable} />
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="section-title">Event details</h2>
+            {event.detailsLockedAt && <Pill tone="blue">Locked by SFSI office</Pill>}
+          </div>
+          {!canEdit && (
+            <p className="mb-4 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+              {event.detailsLockedAt
+                ? "The SFSI office has locked these details while they finalize your simchah. To change anything, message your coordinator."
+                : "This event is closed, so its details can no longer be changed."}
+            </p>
+          )}
+          <EventIntakeForm
+            action={updateEvent}
+            mode="family"
+            event={pickIntakeValues(event)}
+            venues={pickFamilyVenueOptions(venues, event.venueId)}
+            packages={packages.map((p) => ({ id: p.id, name: p.name }))}
+            readOnly={!canEdit}
+            submitLabel="Save details"
+          />
         </div>
       </div>
       <div className="grid content-start gap-6">
         <div className="card grid gap-3 text-sm">
           <h2 className="section-title">At a glance</h2>
           <div className="flex gap-2"><UserRound className="h-4 w-4 text-gray-400" /><span>Coordinator: {event.coordinator ? <>{event.coordinator.name}{event.coordinator.phone && ` · ${event.coordinator.phone}`}</> : "Assigned after review"}</span></div>
-          <div className="flex gap-2"><MapPin className="h-4 w-4 text-gray-400" /><span>{event.venue?.name ?? event.venueNotes ?? "Venue to be decided"}</span></div>
+          <div className="flex gap-2"><MapPin className="h-4 w-4 text-gray-400" /><span>{event.venue?.name ?? event.venueNotes ?? "Venue to be decided"}{event.venue?.address && <span className="block text-gray-500">{event.venue.address}</span>}</span></div>
+          {event.plannerName && <div className="flex gap-2"><UserRound className="h-4 w-4 text-gray-400" /><span>Planner: {event.plannerName}{event.plannerCompany && `, ${event.plannerCompany}`}</span></div>}
           <div className="flex gap-2"><Package className="h-4 w-4 text-gray-400" /><span>{event.package?.name ?? "À la carte"}</span></div>
           {event.startTime && <div className="flex gap-2"><CalendarDays className="h-4 w-4 text-gray-400" /><span>{formatTime(event.startTime)}{event.endTime && ` – ${formatTime(event.endTime)}`}</span></div>}
         </div>
+        <KeyTimes event={event} />
+        {event.type === "wedding" && (event.groomName || event.brideName) && (
+          <div className="card grid gap-2 text-sm">
+            <h2 className="section-title">Chosson & kallah</h2>
+            {event.groomName && <div><span className="font-medium">{event.groomName}</span>{event.groomParents && <span className="text-gray-500">, son of {event.groomParents}</span>}</div>}
+            {event.brideName && <div><span className="font-medium">{event.brideName}</span>{event.brideParents && <span className="text-gray-500">, daughter of {event.brideParents}</span>}</div>}
+          </div>
+        )}
         {schedule.length > 0 && (
           <div className="card">
             <h2 className="section-title mb-3">Day-of timeline</h2>
@@ -170,13 +198,35 @@ async function Overview({ event, editable }: { event: Detail; editable: boolean 
             ))}
           </ul>
         </div>
-        {editable && (
+        {clientCanEdit(event.status) && (
           <form action={cancelEvent}>
             <input type="hidden" name="eventId" value={event.id} />
             <SubmitButton className="btn-danger w-full" confirm="Cancel this event? This can't be undone online.">Cancel event</SubmitButton>
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+function KeyTimes({ event }: { event: Detail }) {
+  const wedding = event.type === "wedding";
+  const rows = [
+    ["Venue access / setup", event.venueAccessTime],
+    [wedding ? "Kabbalas Panim / cocktails" : event.type === "bris" ? "Reception" : "Reception / cocktails", event.cocktailsTime],
+    [wedding ? "Chuppah" : event.type === "bris" ? "Bris" : "Ceremony", event.ceremonyTime],
+    ["Dessert", event.dessertTime],
+    ["Must be out by", event.venueOutTime],
+  ].filter((r): r is [string, string] => Boolean(r[1]));
+  if (rows.length === 0) return null;
+  return (
+    <div className="card">
+      <h2 className="section-title mb-3">Key times</h2>
+      <dl className="grid gap-1.5 text-sm">
+        {rows.map(([label, time]) => (
+          <div key={label} className="flex justify-between gap-3"><dt className="text-gray-600">{label}</dt><dd className="font-medium">{formatTime(time)}</dd></div>
+        ))}
+      </dl>
     </div>
   );
 }

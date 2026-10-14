@@ -5,16 +5,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/lib/db";
 import { hashPassword, requireUser, verifyPassword } from "@/lib/auth";
-import { clientCanEdit, getAccessibleEvent, logActivity, provisionFromQuote } from "@/lib/events";
+import { parseFamilyIntake, resolveFamilyVenue } from "@/lib/event-intake";
+import { clientCanEdit, familyCanEditDetails, getAccessibleEvent, logActivity, provisionFromQuote } from "@/lib/events";
 import { EVENT_TYPE_LABELS, formatDate, money, toCents } from "@/lib/format";
-import { int, isoDateOrNull, oneOf, optStr, str, uuidOrNull } from "@/lib/forms";
+import { int, oneOf, optStr, str, uuidOrNull } from "@/lib/forms";
 import { operatorInbox, sendEmail, siteUrl } from "@/lib/notify";
 import { createOrReplacePlan, DEFAULT_PLAN } from "@/lib/plans";
 import { quoteTotals } from "@/lib/quotes";
 import { getStripe } from "@/lib/stripe";
 import type { FormState } from "./auth";
 
-const EVENT_TYPES = schema.eventType.enumValues;
 
 async function ownedEvent(eventId: string) {
   const user = await requireUser();
@@ -24,30 +24,13 @@ async function ownedEvent(eventId: string) {
   return { user, event };
 }
 
-function eventFields(fd: FormData) {
-  const type = oneOf(fd, "type", EVENT_TYPES);
-  const title = str(fd, "title") || EVENT_TYPE_LABELS[type];
-  const guestCount = int(fd, "guestCount");
-  return {
-    title: title.slice(0, 200),
-    type,
-    eventDate: isoDateOrNull(fd, "eventDate"),
-    startTime: optStr(fd, "startTime"),
-    endTime: optStr(fd, "endTime"),
-    guestCount: guestCount != null ? Math.min(Math.max(guestCount, 0), 5000) : null,
-    venueId: uuidOrNull(fd, "venueId"),
-    venueNotes: optStr(fd, "venueNotes"),
-    packageId: uuidOrNull(fd, "packageId"),
-    budget: toCents(fd.get("budget")),
-    notes: optStr(fd, "notes"),
-  };
-}
-
 export async function createEvent(formData: FormData) {
   const user = await requireUser();
+  const fields = parseFamilyIntake(formData);
+  const venueId = await resolveFamilyVenue(formData);
   const [event] = await db
     .insert(schema.events)
-    .values({ ...eventFields(formData), ownerId: user.id })
+    .values({ ...fields, venueId, ownerId: user.id, contactName: user.name, contactEmail: user.email, contactPhone: user.phone })
     .returning();
   await logActivity(event.id, user.id, "Created event draft");
   redirect(`/portal/events/${event.id}?tab=services`);
@@ -55,10 +38,26 @@ export async function createEvent(formData: FormData) {
 
 export async function updateEvent(formData: FormData) {
   const { user, event } = await ownedEvent(str(formData, "eventId"));
-  if (!clientCanEdit(event.status)) throw new Error("This event is booked. Message your coordinator to make changes.");
-  await db.update(schema.events).set(eventFields(formData)).where(eq(schema.events.id, event.id));
+  if (!familyCanEditDetails(event)) {
+    throw new Error("The SFSI office has locked these details. Message your coordinator to make changes.");
+  }
+  const fields = parseFamilyIntake(formData);
+  const venueId = await resolveFamilyVenue(formData, event.id);
+  await db.update(schema.events).set({ ...fields, venueId }).where(eq(schema.events.id, event.id));
   await logActivity(event.id, user.id, "Updated event details");
+  // Once SFSI is working on the event, let the coordinator know the family changed something.
+  if (event.status !== "draft") {
+    const coordinator = event.coordinatorId
+      ? await db.query.users.findFirst({ where: eq(schema.users.id, event.coordinatorId) })
+      : null;
+    await sendEmail(
+      coordinator ? [coordinator.email] : operatorInbox(),
+      `Details updated: ${fields.title}`,
+      `${user.name} updated the event details for "${fields.title}".\n\n${siteUrl(`/admin/events/${event.id}`)}`,
+    );
+  }
   revalidatePath(`/portal/events/${event.id}`);
+  revalidatePath(`/admin/events/${event.id}`);
 }
 
 export async function submitEvent(formData: FormData) {

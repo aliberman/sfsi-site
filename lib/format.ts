@@ -65,7 +65,7 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   wedding: "Wedding",
   bar_mitzvah: "Bar Mitzvah",
   bat_mitzvah: "Bat Mitzvah",
-  bris: "Bris",
+  bris: "Bris Milah",
   kiddush: "Kiddush",
   sheva_brachos: "Sheva Brachos",
   upsherin: "Upsherin",

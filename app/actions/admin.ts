@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/lib/db";
 import { requireAdmin, requireOperator } from "@/lib/auth";
+import { parseOperatorIntake, resolveOperatorVenue } from "@/lib/event-intake";
 import { logActivity, provisionFromQuote } from "@/lib/events";
 import { EVENT_STATUS_LABELS, formatDate, label, money, PAYMENT_METHOD_LABELS, toCents } from "@/lib/format";
 import { bool, int, isoDateOrNull, oneOf, optStr, str, uuidOrNull } from "@/lib/forms";
+import { eventContact } from "@/lib/event-contact";
 import { sendEmail, siteUrl } from "@/lib/notify";
 import { createOrReplacePlan, DEFAULT_PLAN, refreshPlanStatus } from "@/lib/plans";
 import { defaultQuantity, quoteTotals } from "@/lib/quotes";
@@ -37,10 +39,63 @@ export async function setEventStatus(formData: FormData) {
   await db.update(schema.events).set({ status }).where(eq(schema.events.id, event.id));
   await logActivity(event.id, user.id, `Status → ${EVENT_STATUS_LABELS[status]}`);
   await sendEmail(
-    event.owner.email,
+    eventContact(event).email ?? [],
     `Update on ${event.title}: ${EVENT_STATUS_LABELS[status]}`,
     `Your event "${event.title}" is now marked ${EVENT_STATUS_LABELS[status]}.\n\n${siteUrl(`/portal/events/${event.id}`)}`,
   );
+  done(event.id);
+}
+
+// ── Operator-created events ─────────────────────────────────────────────────
+
+/** The portal account to attach an event to, if the family already has one. */
+async function accountFor(contactEmail: string | null) {
+  if (!contactEmail) return null;
+  const user = await db.query.users.findFirst({ where: eq(schema.users.email, contactEmail) });
+  return user?.id ?? null;
+}
+
+export async function createOperatorEvent(formData: FormData) {
+  const user = await requireOperator();
+  const fields = parseOperatorIntake(formData);
+  const venueId = await resolveOperatorVenue(formData);
+  const [event] = await db
+    .insert(schema.events)
+    .values({
+      ...fields,
+      venueId,
+      ownerId: await accountFor(fields.contactEmail),
+      createdById: user.id,
+      coordinatorId: user.id,
+      status: "submitted",
+      submittedAt: new Date(),
+    })
+    .returning();
+  await logActivity(event.id, user.id, "Created event in back office");
+  revalidatePath("/admin");
+  revalidatePath("/admin/events");
+  redirect(eventPath(event.id));
+}
+
+export async function updateOperatorEvent(formData: FormData) {
+  const { user, event } = await loadEvent(formData);
+  const fields = parseOperatorIntake(formData);
+  const venueId = await resolveOperatorVenue(formData);
+  // Link to a portal account if the contact email now matches one; never unlink.
+  const ownerId = event.ownerId ?? (await accountFor(fields.contactEmail));
+  await db.update(schema.events).set({ ...fields, venueId, ownerId }).where(eq(schema.events.id, event.id));
+  await logActivity(event.id, user.id, "Updated event details");
+  done(event.id);
+}
+
+export async function setDetailsLock(formData: FormData) {
+  const { user, event } = await loadEvent(formData);
+  const lock = bool(formData, "lock");
+  await db
+    .update(schema.events)
+    .set(lock ? { detailsLockedAt: new Date(), detailsLockedById: user.id } : { detailsLockedAt: null, detailsLockedById: null })
+    .where(eq(schema.events.id, event.id));
+  await logActivity(event.id, user.id, lock ? "Locked event details (family view is read-only)" : "Unlocked event details for the family");
   done(event.id);
 }
 
@@ -50,23 +105,6 @@ export async function assignCoordinator(formData: FormData) {
   await db.update(schema.events).set({ coordinatorId }).where(eq(schema.events.id, event.id));
   const coordinator = coordinatorId ? await db.query.users.findFirst({ where: eq(schema.users.id, coordinatorId) }) : null;
   await logActivity(event.id, user.id, coordinator ? `Coordinator: ${coordinator.name}` : "Coordinator unassigned");
-  done(event.id);
-}
-
-export async function updateEventDetails(formData: FormData) {
-  const { user, event } = await loadEvent(formData);
-  await db
-    .update(schema.events)
-    .set({
-      eventDate: isoDateOrNull(formData, "eventDate"),
-      startTime: optStr(formData, "startTime"),
-      endTime: optStr(formData, "endTime"),
-      guestCount: int(formData, "guestCount"),
-      venueId: uuidOrNull(formData, "venueId"),
-      venueNotes: optStr(formData, "venueNotes"),
-    })
-    .where(eq(schema.events.id, event.id));
-  await logActivity(event.id, user.id, "Updated event logistics");
   done(event.id);
 }
 
@@ -228,9 +266,9 @@ export async function sendQuote(formData: FormData) {
     await logActivity(event.id, user.id, `Sent quote #${quote.number} (${money(total)})`, tx);
   });
   await sendEmail(
-    event.owner.email,
+    eventContact(event).email ?? [],
     `Your quote for ${event.title} is ready`,
-    `Hi ${event.owner.name},\n\nYour quote for "${event.title}" (${money(total)}) is ready to review${quote.validUntil ? ` and is valid until ${formatDate(quote.validUntil)}` : ""}.\n\n${siteUrl(`/portal/events/${event.id}?tab=quote`)}\n\n— South Florida Simchah Initiative`,
+    `Hi ${eventContact(event).name ?? "there"},\n\nYour quote for "${event.title}" (${money(total)}) is ready to review${quote.validUntil ? ` and is valid until ${formatDate(quote.validUntil)}` : ""}.\n\n${siteUrl(`/portal/events/${event.id}?tab=quote`)}\n\n— South Florida Simchah Initiative`,
   );
   done(event.id);
 }
@@ -328,7 +366,7 @@ export async function buildPaymentPlan(formData: FormData) {
     await logActivity(event.id, user.id, `Built payment plan for ${money(total)}`, tx);
   });
   await sendEmail(
-    event.owner.email,
+    eventContact(event).email ?? [],
     `Payment plan for ${event.title}`,
     `Your payment schedule for "${event.title}" is ready.\n\n${siteUrl(`/portal/events/${event.id}?tab=payments`)}`,
   );
@@ -355,7 +393,7 @@ export async function recordPayment(formData: FormData) {
   await refreshPlanStatus(installment.planId);
   await logActivity(event.id, user.id, `Recorded ${money(installment.amount)} ${label(PAYMENT_METHOD_LABELS, method)} for ${installment.label}`);
   await sendEmail(
-    event.owner.email,
+    eventContact(event).email ?? [],
     `Payment received — ${event.title}`,
     `We received ${money(installment.amount)} for ${installment.label}. Thank you!\n\n${siteUrl(`/portal/events/${event.id}?tab=payments`)}`,
   );
@@ -526,7 +564,7 @@ export async function postOperatorMessage(formData: FormData) {
   await db.insert(schema.messages).values({ eventId: event.id, authorId: user.id, body: body.slice(0, 5000), internal });
   if (!internal) {
     await sendEmail(
-      event.owner.email,
+      eventContact(event).email ?? [],
       `New message about ${event.title}`,
       `${user.name} from SFSI wrote:\n\n${body}\n\n${siteUrl(`/portal/events/${event.id}?tab=messages`)}`,
     );
@@ -583,6 +621,10 @@ export async function saveVenue(formData: FormData) {
   const values = {
     name,
     neighborhood: optStr(formData, "neighborhood"),
+    address: optStr(formData, "address"),
+    contactName: optStr(formData, "contactName"),
+    contactPhone: optStr(formData, "contactPhone"),
+    contactEmail: optStr(formData, "contactEmail"),
     capacity: int(formData, "capacity"),
     shabbosFriendly: bool(formData, "shabbosFriendly"),
     description: optStr(formData, "description"),

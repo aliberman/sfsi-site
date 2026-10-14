@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
@@ -33,6 +33,11 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
     .insert(schema.users)
     .values({ name, email, phone: phone || null, passwordHash: await hashPassword(password) })
     .returning();
+  // Attach any events the SFSI team already created for this family.
+  await db
+    .update(schema.events)
+    .set({ ownerId: user.id })
+    .where(and(isNull(schema.events.ownerId), eq(schema.events.contactEmail, email)));
   await startSession(user);
   redirect(safeNext(formData.get("next"), "/portal"));
 }

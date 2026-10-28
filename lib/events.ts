@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { isStaff, type CurrentUser } from "@/lib/auth";
 import { addDays, formatTime, todayIso } from "@/lib/format";
@@ -9,6 +9,14 @@ type Db = typeof db | Tx;
 
 export async function logActivity(eventId: string, actorId: string | null, action: string, conn: Db = db) {
   await conn.insert(schema.activity).values({ eventId, actorId, action });
+}
+
+/** Attaches events the SFSI team created for this family (by contact email) to their new account. */
+export async function claimEventsFor(userId: string, email: string) {
+  await db
+    .update(schema.events)
+    .set({ ownerId: userId })
+    .where(and(isNull(schema.events.ownerId), eq(schema.events.contactEmail, email.toLowerCase())));
 }
 
 /** Loads an event the user may act on: their own, or any event for operators. */

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db, schema } from "@/lib/db";
 import { EVENT_TYPE_LABELS, toCents } from "@/lib/format";
 import { int, isoDateOrNull, optStr, str, uuidOrNull } from "@/lib/forms";
+import { suggestTitle } from "@/lib/intake-title";
 
 // Shared parsing for the event intake form (operator back office and family portal).
 
@@ -30,8 +31,10 @@ function eventType(fd: FormData) {
 /** Fields both sides edit. Operators must give a date; families may save a draft without one. */
 function parseCommon(fd: FormData, operator: boolean) {
   const type = eventType(fd);
-  const title = str(fd, "title") || (operator ? "" : EVENT_TYPE_LABELS[type]);
-  if (!title) throw new Error("Give the event a title.");
+  const title =
+    str(fd, "title") ||
+    suggestTitle({ type, groomName: str(fd, "groomName"), brideName: str(fd, "brideName"), contactName: str(fd, "contactName") }) ||
+    EVENT_TYPE_LABELS[type];
   const eventDate = isoDateOrNull(fd, "eventDate");
   if (operator && !eventDate) throw new Error("Choose the event date.");
   const guestCount = int(fd, "guestCount");

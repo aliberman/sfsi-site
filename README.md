@@ -35,6 +35,24 @@ When a family accepts a quote, the event is booked **automatically**:
 
 Operators can rebuild the plan or adjust individual installments. A plan can't be rebuilt once a payment has been recorded.
 
+## Sign in with Google and Microsoft
+
+Optional. Each button appears on the sign-in and sign-up pages once its keys are set. Families who sign up this way have no password until they add one on their Account page, where they can also connect the other provider.
+
+**Google**
+1. Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID (Web application).
+2. Authorized redirect URI: `https://floridasimchah.org/api/auth/google/callback`.
+3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Netlify.
+
+**Microsoft**
+1. Azure portal → Microsoft Entra ID → App registrations → New registration. Supported account types: *any organizational directory and personal Microsoft accounts*.
+2. Redirect URI (Web): `https://floridasimchah.org/api/auth/microsoft/callback`.
+3. Certificates & secrets → New client secret.
+4. Token configuration → Add optional claims (ID token): `email` and `xms_edov`.
+5. Set `MICROSOFT_CLIENT_ID` (the Application ID), `MICROSOFT_CLIENT_SECRET` and `MICROSOFT_TENANT_ID=common` in Netlify.
+
+**How accounts are matched:** a returning Google/Microsoft identity always signs into the account it was first linked to. A new identity links to an existing account by email only when the provider vouches for the email: Google's `email_verified`, or for Microsoft a personal account or a verified domain (`xms_edov`). Work and school tenants can otherwise put any address in the email claim, so unverified Microsoft emails can't create or take over accounts. Those users sign in with email and password, then connect Microsoft from their Account page.
+
 ## Stack
 
 Next.js 14 server components and server actions · Postgres via Drizzle ORM · cookie sessions (signed JWT with `jose`, passwords hashed with `bcryptjs`) · Tailwind · optional Stripe Checkout and Resend email.

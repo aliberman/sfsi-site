@@ -39,8 +39,8 @@ export async function getCurrentUser() {
   if (!session) return null;
   const user = await db.query.users.findFirst({ where: eq(schema.users.id, session.sub) });
   if (!user) return null;
-  const { passwordHash: _omit, ...safe } = user;
-  return safe;
+  const { passwordHash, ...safe } = user;
+  return { ...safe, hasPassword: Boolean(passwordHash) };
 }
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;

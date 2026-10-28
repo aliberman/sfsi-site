@@ -4,10 +4,12 @@ import { PageHeader } from "@/components/ui";
 import { centsToInput, money } from "@/lib/format";
 import { getImpactStats } from "@/lib/impact";
 import { getImpactSettings } from "@/lib/settings";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
+  await requireOperator();
   const [settings, stats] = await Promise.all([getImpactSettings(), getImpactStats()]);
   return (
     <div className="mx-auto grid max-w-3xl gap-6">

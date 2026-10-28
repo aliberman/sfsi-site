@@ -5,10 +5,12 @@ import { PageHeader } from "@/components/ui";
 import { db, schema } from "@/lib/db";
 import { pickFamilyVenueOptions } from "@/lib/intake-values";
 import { activePackages } from "@/lib/public-data";
+import { requireUser } from "@/lib/auth";
 
 export const metadata = { title: "New event" };
 
 export default async function NewEventPage({ searchParams }: { searchParams: { package?: string } }) {
+  await requireUser();
   const [venues, packages] = await Promise.all([
     db.query.venues.findMany({ where: eq(schema.venues.active, true), orderBy: [asc(schema.venues.name)] }),
     activePackages(),

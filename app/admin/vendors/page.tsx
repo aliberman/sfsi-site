@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { Options, PageHeader, Pill } from "@/components/ui";
 import { db, schema } from "@/lib/db";
 import { VENDOR_CATEGORY_LABELS } from "@/lib/format";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Vendors" };
 
@@ -27,6 +28,7 @@ function VendorForm({ v }: { v?: Vendor }) {
 }
 
 export default async function VendorsAdminPage() {
+  await requireOperator();
   const vendors = await db.query.vendors.findMany({ orderBy: [asc(schema.vendors.category), asc(schema.vendors.name)] });
   return (
     <div className="grid gap-6">

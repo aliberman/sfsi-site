@@ -3,6 +3,7 @@ import { saveVenue } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/SubmitButton";
 import { PageHeader, Pill } from "@/components/ui";
 import { db, schema } from "@/lib/db";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Venues" };
 
@@ -28,6 +29,7 @@ function VenueForm({ v }: { v?: Venue }) {
 }
 
 export default async function VenuesAdminPage() {
+  await requireOperator();
   const venues = await db.query.venues.findMany({ orderBy: [asc(schema.venues.name)] });
   return (
     <div className="grid gap-6">

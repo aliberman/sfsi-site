@@ -4,12 +4,14 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { EmptyState, PageHeader, Pill } from "@/components/ui";
 import { db, schema } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Inquiries" };
 
 const KIND_LABELS: Record<string, string> = { plan: "Planning", partner: "Partner", donate: "Donation", general: "General" };
 
 export default async function InquiriesPage() {
+  await requireOperator();
   const rows = await db.query.inquiries.findMany({ orderBy: [asc(schema.inquiries.handled), desc(schema.inquiries.createdAt)], limit: 200 });
   return (
     <div className="grid gap-6">

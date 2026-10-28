@@ -5,10 +5,12 @@ import EventIntakeForm from "@/components/EventIntakeForm";
 import { pickVenueOptions } from "@/lib/intake-values";
 import { PageHeader } from "@/components/ui";
 import { db, schema } from "@/lib/db";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "New event" };
 
 export default async function NewOperatorEventPage() {
+  await requireOperator();
   const venues = await db.query.venues.findMany({ orderBy: [asc(schema.venues.name)] });
   return (
     <div className="mx-auto grid max-w-5xl gap-6">

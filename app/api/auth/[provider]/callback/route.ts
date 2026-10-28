@@ -1,11 +1,12 @@
 import { decodeIdToken } from "arctic";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { getCurrentUser, isStaff, startSession } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { oauthClient, resolveOAuthUser } from "@/lib/oauth";
 import { profileFromClaims } from "@/lib/oauth-profile";
+import { relativeRedirect } from "@/lib/relative-redirect";
 import { safeNext } from "@/lib/safe-next";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { provider: st
   for (const name of ["oauth_state", "oauth_verifier", "oauth_next", "oauth_link"]) jar.delete(name);
 
   const failTo = linking ? "/portal/account" : "/login";
-  const fail = (message: string) => {
-    const url = new URL(failTo, req.url);
-    url.searchParams.set("error", message);
-    return NextResponse.redirect(url);
-  };
+  const fail = (message: string) => relativeRedirect(failTo, { error: message });
 
   const oauth = oauthClient(params.provider);
   const code = req.nextUrl.searchParams.get("code");
@@ -61,5 +58,5 @@ export async function GET(req: NextRequest, { params }: { params: { provider: st
   if (!user) return fail("We couldn’t find your account.");
   await startSession(user);
   const destination = linking ? "/portal/account?connected=1" : safeNext(next, isStaff(user) ? "/admin" : "/portal");
-  return NextResponse.redirect(new URL(destination, req.url));
+  return relativeRedirect(destination);
 }

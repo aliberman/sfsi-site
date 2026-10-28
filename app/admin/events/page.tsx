@@ -3,10 +3,12 @@ import { and, asc, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, formatDate } from "@/lib/format";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Events" };
 
 export default async function AdminEventsPage({ searchParams }: { searchParams: { status?: string; q?: string } }) {
+  await requireOperator();
   const status = schema.eventStatus.enumValues.find((s) => s === searchParams.status);
   const q = searchParams.q?.trim();
   const filters: SQL[] = [];

@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { PageHeader, Pill } from "@/components/ui";
 import { db, schema } from "@/lib/db";
 import { centsToInput, money } from "@/lib/format";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Packages" };
 
@@ -25,6 +26,7 @@ function PackageForm({ p }: { p?: Pkg }) {
 }
 
 export default async function PackagesAdminPage() {
+  await requireOperator();
   const packages = await db.query.packages.findMany({ orderBy: [asc(schema.packages.sortOrder)] });
   return (
     <div className="grid gap-6">

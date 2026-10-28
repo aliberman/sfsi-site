@@ -3,10 +3,12 @@ import { and, asc, count, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { addDays, daysUntil, EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, formatDate, money, TASK_CATEGORY_LABELS, todayIso } from "@/lib/format";
 import { EmptyState, PageHeader, Pill, Stat, StatusBadge } from "@/components/ui";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Back office" };
 
 export default async function AdminDashboard() {
+  await requireOperator();
   const today = todayIso();
   const [statusCounts, needsQuote, upcoming, overdue, receivable, dueTasks, newInquiries] = await Promise.all([
     db.select({ status: schema.events.status, n: count() }).from(schema.events).groupBy(schema.events.status),

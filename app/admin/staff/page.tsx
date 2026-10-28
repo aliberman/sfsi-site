@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { Options, PageHeader, Pill } from "@/components/ui";
 import { db, schema } from "@/lib/db";
 import { centsToInput, money, STAFF_ROLE_LABELS } from "@/lib/format";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Staff" };
 
@@ -26,6 +27,7 @@ function MemberForm({ m }: { m?: Member }) {
 }
 
 export default async function StaffPage() {
+  await requireOperator();
   const members = await db.query.staffMembers.findMany({
     orderBy: [asc(schema.staffMembers.primaryRole), asc(schema.staffMembers.name)],
   });

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { oauthClient } from "@/lib/oauth";
+import { relativeRedirect } from "@/lib/relative-redirect";
 import { safeNext } from "@/lib/safe-next";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,10 @@ const COOKIE = { httpOnly: true, secure: process.env.NODE_ENV === "production", 
 // Starts a Google/Microsoft sign-in (or, with ?link=1, connects it to the signed-in account).
 export async function GET(req: NextRequest, { params }: { params: { provider: string } }) {
   const oauth = oauthClient(params.provider);
-  if (!oauth) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent("That sign-in option isn’t available.")}`, req.url));
+  if (!oauth) return relativeRedirect("/login", { error: "That sign-in option isn’t available." });
 
   const link = req.nextUrl.searchParams.get("link") === "1";
-  if (link && !(await getCurrentUser())) return NextResponse.redirect(new URL("/login", req.url));
+  if (link && !(await getCurrentUser())) return relativeRedirect("/login");
 
   const state = generateState();
   const verifier = generateCodeVerifier();

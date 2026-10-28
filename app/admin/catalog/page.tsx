@@ -5,6 +5,7 @@ import { Options, PageHeader, Pill } from "@/components/ui";
 import { db, schema } from "@/lib/db";
 import type { CatalogItem } from "@/lib/db/schema";
 import { CATEGORY_LABELS, centsToInput, money, UNIT_LABELS } from "@/lib/format";
+import { requireOperator } from "@/lib/auth";
 
 export const metadata = { title: "Catalog" };
 
@@ -25,6 +26,7 @@ function ItemForm({ item }: { item?: CatalogItem }) {
 }
 
 export default async function CatalogPage() {
+  await requireOperator();
   const items = await db.query.catalogItems.findMany({ orderBy: [asc(schema.catalogItems.category), asc(schema.catalogItems.name)] });
   return (
     <div className="grid gap-6">

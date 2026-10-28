@@ -1,11 +1,19 @@
 [build]
-  # Apply pending migrations and load starter data (the seed only fills empty
-  # tables and creates/promotes ADMIN_EMAIL), then build the site.
+  # Production: apply pending migrations and load starter data (the seed only fills
+  # empty tables and creates/promotes ADMIN_EMAIL), then build the site.
   command = "npm run db:migrate && npm run db:seed && npm run build"
   publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Deploy previews and branch deploys build unmerged code, so they must never migrate
+# or seed the production database (and Netlify doesn't give them secret env vars).
+[context.deploy-preview]
+  command = "npm run build"
+
+[context.branch-deploy]
+  command = "npm run build"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

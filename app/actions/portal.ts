@@ -257,7 +257,8 @@ export async function updateAccount(_prev: FormState, formData: FormData): Promi
   if (newPassword) {
     if (newPassword.length < 8) return { error: "New password must be at least 8 characters." };
     const full = await db.query.users.findFirst({ where: eq(schema.users.id, user.id) });
-    if (!full || !(await verifyPassword(str(formData, "currentPassword"), full.passwordHash))) {
+    // Accounts created with Google/Microsoft have no password yet and can set one directly.
+    if (!full || (full.passwordHash && !(await verifyPassword(str(formData, "currentPassword"), full.passwordHash)))) {
       return { error: "Your current password is incorrect." };
     }
     updates.passwordHash = await hashPassword(newPassword);

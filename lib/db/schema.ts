@@ -9,6 +9,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -118,12 +119,29 @@ const timestamps = {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  // Null for accounts that only sign in with Google or Microsoft.
+  passwordHash: text("password_hash"),
   name: text("name").notNull(),
   phone: text("phone"),
   role: userRole("role").notNull().default("client"),
   ...timestamps,
 });
+
+// External sign-in identities (Google, Microsoft) linked to a user.
+export const oauthAccounts = pgTable(
+  "oauth_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // "google" | "microsoft"
+    providerUserId: text("provider_user_id").notNull(),
+    email: text("email"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("oauth_accounts_provider_user").on(t.provider, t.providerUserId)],
+);
 
 export const venues = pgTable("venues", {
   id: uuid("id").primaryKey().defaultRandom(),

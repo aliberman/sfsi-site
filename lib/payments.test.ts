@@ -4,6 +4,7 @@ import { buildSchedule } from "./payments";
 import { quoteTotals } from "./quotes";
 import { averageSavings } from "./impact-math";
 import { databaseUrl } from "./db/url";
+import { profileFromClaims } from "./oauth-profile";
 
 test("schedule sums to total and ends before the event", () => {
   const s = buildSchedule({ total: 1_000_001, depositPercent: 25, installmentCount: 3, eventDate: "2027-06-01", finalDueDaysBefore: 14, startDate: "2026-10-14" });
@@ -59,4 +60,22 @@ test("average savings is hidden without a benchmark or data", () => {
 test("libpq-only params are stripped from Neon-style URLs", () => {
   const url = databaseUrl("postgresql://u:p@ep-x.neon.tech/neondb?sslmode=require&channel_binding=require");
   assert.equal(url, "postgresql://u:p@ep-x.neon.tech/neondb?sslmode=require");
+});
+
+test("google identities trust only verified emails", () => {
+  assert.deepEqual(
+    profileFromClaims("google", { sub: "g1", email: "A@Example.com", email_verified: true, name: "A" }),
+    { provider: "google", providerUserId: "g1", email: "a@example.com", emailVerified: true, name: "A" },
+  );
+  assert.equal(profileFromClaims("google", { sub: "g1", email: "a@example.com", email_verified: false }).emailVerified, false);
+});
+
+test("microsoft emails are trusted only for personal accounts or verified domains", () => {
+  const personal = profileFromClaims("microsoft", { sub: "m1", email: "a@outlook.com", tid: "9188040d-6c67-4c5b-b112-36a304b66dad" });
+  assert.equal(personal.emailVerified, true);
+  const work = profileFromClaims("microsoft", { sub: "m2", email: "ceo@victim.com", tid: "some-other-tenant" });
+  assert.equal(work.emailVerified, false);
+  const verifiedDomain = profileFromClaims("microsoft", { sub: "m3", email: "a@company.com", tid: "t", xms_edov: true });
+  assert.equal(verifiedDomain.emailVerified, true);
+  assert.throws(() => profileFromClaims("microsoft", { email: "x@y.com" }));
 });
